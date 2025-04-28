@@ -14,11 +14,15 @@ python3 lxc-shell-menu.py --install
 
 After installation, open a new terminal window. The menu will display a list of available LXC containers:
 
-```bash
+```
+wiktorpyk-pc login: wiktorpyk
+Password: 
 [sudo] password for wiktorpyk: 
 Choose container to start:
-host              vm1               vm2
+host              vm1               vm2               vm3
 vm1
 Attaching to container 'vm1'. Press Ctrl+D or type exit to leave.
-root@vm1:/# 
+root@vm1:/# exit
+exit
+wiktorpyk@wiktorpyk-pc:~$ 
 ```
