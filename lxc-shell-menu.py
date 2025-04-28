@@ -7,13 +7,27 @@ import shutil
 import subprocess
 import sys
 import signal
+import termios
+import tty
+
+original_terminal_settings = None
+
+def capture_terminal_settings():
+    global original_terminal_settings
+    original_terminal_settings = termios.tcgetattr(sys.stdin)
+
+def restore_terminal_settings_and_exit(*args):
+    global original_terminal_settings
+    if original_terminal_settings:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, original_terminal_settings)
+    sys.exit(1)
 
 def install():
     script_path = os.path.abspath(__file__)
     target_path = "/usr/local/bin/lxc-shell-menu"
     try:
-        subprocess.run(["sudo", "cp", script_path, target_path], check=True)
-        subprocess.run(["sudo", "chmod", "755", target_path], check=True)
+        subprocess.run(["cp", script_path, target_path], check=True)
+        subprocess.run(["chmod", "755", target_path], check=True)
     except subprocess.CalledProcessError as e:
         print(f"Error: {e}")
         return
@@ -74,10 +88,8 @@ def show_list():
         print(f"Invalid choice: {choice}")
 
 def main():
-    def signal_handler(sig, frame):
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, signal_handler)
+    capture_terminal_settings()
+    signal.signal(signal.SIGINT, restore_terminal_settings_and_exit)
 
     parser = argparse.ArgumentParser(description="lxc-shell-menu")
     parser.add_argument("--install", action="store_true", help="Run installation process")
@@ -86,15 +98,12 @@ def main():
 
     args = parser.parse_args()
 
-    if (args.show_list or args.bashrc) and os.geteuid() != 0:
-        try:
-            subprocess.run(["sudo", sys.executable] + sys.argv, check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to re-run as root: {e}")
-        return
-
     if not any(vars(args).values()):
         parser.print_help()
+        return
+    
+    if os.geteuid() != 0:
+        subprocess.run(["sudo", sys.executable] + sys.argv, check=True)
         return
 
     if args.install:
