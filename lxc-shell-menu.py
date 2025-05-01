@@ -20,6 +20,7 @@ def restore_terminal_settings_and_exit(*args):
     global original_terminal_settings
     if original_terminal_settings:
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, original_terminal_settings)
+    print()
     sys.exit(1)
 
 def install():
