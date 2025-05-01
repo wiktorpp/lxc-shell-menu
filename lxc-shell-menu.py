@@ -60,7 +60,7 @@ def install():
     except Exception as e:
         print(f"Error adding sudoers rule: {e}")
 
-def show_list():
+def container_interface():
     if os.geteuid() != 0:
         try:
             subprocess.run(["sudo"] + sys.argv, check=True)
@@ -117,10 +117,25 @@ def main():
     capture_terminal_settings()
     signal.signal(signal.SIGINT, restore_terminal_settings_and_exit)
 
-    parser = argparse.ArgumentParser(description="lxc-shell-menu")
-    parser.add_argument("--install", action="store_true", help="Run installation process")
-    parser.add_argument("--show-list", action="store_true", help="Display a list")
-    parser.add_argument("--bashrc", action="store_true", help="Executed from .bashrc")
+    parser = argparse.ArgumentParser(
+        description="A convenient interactive menu for starting LXC containers",
+        usage="%(prog)s [--install | --menu]",
+    )
+    parser.add_argument(
+        "--install", 
+        action="store_true", 
+        help="install the script to /usr/local/bin and configure auto-start"
+    )
+    parser.add_argument(
+        "--menu", 
+        action="store_true", 
+        help="launch the interactive container selection menu"
+    )
+    parser.add_argument(
+        "--bashrc", 
+        action="store_true", 
+        help="Alias for --menu, executed from .bashrc"
+    )
 
     args = parser.parse_args()
 
@@ -130,10 +145,10 @@ def main():
 
     if args.install:
         install()
-    if args.show_list:
-        show_list()
+    if args.menu:
+        container_interface()
     if args.bashrc:
-        show_list()
+        container_interface()
 
 if __name__ == "__main__":
     main()
