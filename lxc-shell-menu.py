@@ -76,14 +76,17 @@ def show_list():
 
     choice = input()
     if choice == "host":
-        return
+        sys.exit(0)
     elif choice in containers:
         try:
-            subprocess.run(["lxc-start", choice], check=True, stderr=subprocess.PIPE)
+            subprocess.run(["lxc-start", choice], check=True)
+        except subprocess.CalledProcessError as e:
+            sys.exit(e.returncode)
+        try:
             print(f"Attaching to container '{choice}'. Press Ctrl+D or type exit to leave.")
             subprocess.run(["lxc-attach", "-n", choice], check=True)
         except subprocess.CalledProcessError as e:
-            print(f"Error: {e.stderr.decode().strip()}")
+            sys.exit(e.returncode)
     else:
         print(f"Invalid choice: {choice}")
 
@@ -103,7 +106,10 @@ def main():
         return
     
     if os.geteuid() != 0:
-        subprocess.run(["sudo", sys.executable] + sys.argv, check=True)
+        try:
+            subprocess.run(["sudo", sys.executable] + sys.argv, check=True)
+        except subprocess.CalledProcessError as e:
+            sys.exit(e.returncode)
         return
 
     if args.install:
