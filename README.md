@@ -2,6 +2,8 @@
 
 A convenient interactive menu for starting LXC containers when opening a new terminal window.
 
+![screenshot](images/screenshot.png)
+
 ## Installation
 
 ```bash
