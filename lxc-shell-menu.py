@@ -23,6 +23,13 @@ def restore_terminal_settings_and_exit(*args):
     sys.exit(1)
 
 def install():
+    if os.geteuid() != 0:
+        try:
+            subprocess.run(["sudo", "-n", sys.executable] + sys.argv, check=True)
+        except subprocess.CalledProcessError as e:
+            sys.exit(e.returncode)
+        return
+
     script_path = os.path.abspath(__file__)
     target_path = "/usr/local/bin/lxc-shell-menu"
     try:
@@ -44,7 +51,23 @@ def install():
         else:
             print(f"'{command}' already exists in {bashrc_path}")
 
+    sudoers_rule = f"{os.getlogin()} ALL=(ALL) NOPASSWD: {target_path} --bashrc\n"
+    sudoers_path = f"/etc/sudoers.d/lxc-shell-menu"
+    try:
+        with open(sudoers_path, "w") as sudoers_file:
+            sudoers_file.write(sudoers_rule)
+        print(f"Added sudoers rule to {sudoers_path}")
+    except Exception as e:
+        print(f"Error adding sudoers rule: {e}")
+
 def show_list():
+    if os.geteuid() != 0:
+        try:
+            subprocess.run(["sudo"] + sys.argv, check=True)
+        except subprocess.CalledProcessError as e:
+            sys.exit(e.returncode)
+        return
+
     try:
         result = subprocess.run(["lxc-ls"], capture_output=True, text=True, check=True)
         containers = result.stdout.split()
@@ -103,13 +126,6 @@ def main():
 
     if not any(vars(args).values()):
         parser.print_help()
-        return
-    
-    if os.geteuid() != 0:
-        try:
-            subprocess.run(["sudo", sys.executable] + sys.argv, check=True)
-        except subprocess.CalledProcessError as e:
-            sys.exit(e.returncode)
         return
 
     if args.install:

@@ -17,7 +17,6 @@ After installation, open a new terminal window. The menu will display a list of 
 ```
 wiktorpyk-pc login: wiktorpyk
 Password: 
-[sudo] password for wiktorpyk: 
 Choose container to start:
 host              vm1               vm2               vm3
 vm1
