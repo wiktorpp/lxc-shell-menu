@@ -2,7 +2,7 @@
 
 A convenient interactive menu for starting LXC containers when opening a new terminal window.
 
-![screenshot](images/screenshot.png)
+![screenshot](images/screenshot.png?cache_busting=kaujo)
 
 ## Installation
 
