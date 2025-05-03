@@ -70,6 +70,20 @@ def install():
     except Exception as e:
         print(f"Error adding sudoers rule: {e}")
 
+def parse_mount_config(line):
+    parts = line.split()
+    if len(parts) >= 5:
+        host_path = parts[2].rstrip('/')
+        mount_target = parts[3].rstrip('/')     # this is the host-side mount dir
+        host_cwd = os.getcwd().rstrip('/')
+
+        if host_cwd.startswith(host_path):
+            rel = os.path.relpath(host_cwd, host_path)
+            mount_point = '/' + os.path.basename(mount_target)
+            container_path = os.path.join(mount_point, rel)
+            return container_path
+    return None
+
 def container_interface():
     if os.geteuid() != 0:
         subprocess.run(
@@ -120,28 +134,56 @@ def container_interface():
         print(''.join(row_items))
 
     while True:
-        choice = input("> ").strip()
-        if choice == "host":
+        container_name = input("> ").strip()
+        if container_name == "host":
             sys.exit(0)
-        elif choice in containers:
+        elif container_name in containers:
             break
         else:
-            print(f"Invalid choice: {choice}. Please choose from the list above.")
+            print(f"Invalid choice: {container_name}. Please choose from the list above.")
 
     try:
         subprocess.run(
-            ["lxc-start", choice], 
+            ["lxc-start", container_name], 
             check=True,
             stderr=subprocess.DEVNULL
         )
     except subprocess.CalledProcessError as e:
         sys.exit(e.returncode)
 
-    print(f"Attaching to container '{choice}'. Press Ctrl+D or type exit to leave.")
-    subprocess.run(
-        ["lxc-attach", "-n", choice], 
-        check=False
-    )
+    host_path = None
+    destination_path = None
+    config_path = f"/var/lib/lxc/{container_name}/config"
+
+    try:
+        with open(config_path, "r") as config_file:
+            for line in config_file:
+                if line.startswith("lxc.mount.entry"):
+                    destination_path = parse_mount_config(line)
+    except FileNotFoundError:
+        print(f"Config file not found: {config_path}")
+        return
+    except Exception as e:
+        print(f"Error: {e}")
+
+    if destination_path is None:
+        print(
+             "To persist your current working directory in the container, add the correct configuration to container's config file.\n"
+            f"The configuration file is located at {config_path}\n"
+             "Example:\n"
+            f"lxc.mount.entry = /home/{os.getlogin()}/ mnt/ none bind,create=dir 0 0\n"
+        )
+
+    print(f"Attaching to container '{container_name}'. Press Ctrl+D or type exit to leave.")
+    shell = "/bin/bash"
+    if destination_path is None:
+        subprocess.run(
+            ["lxc-attach", "-n", container_name, "--", shell]
+        )
+    else:
+        subprocess.run(
+            ["lxc-attach", "-n", container_name, "--", shell, "-c", f"cd {destination_path} && {shell}"]
+        )
 
 def main():
     capture_terminal_settings()
