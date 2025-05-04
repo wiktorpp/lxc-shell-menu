@@ -8,7 +8,9 @@ import subprocess
 import sys
 import signal
 import termios
-import tty
+
+# Configs
+display_container_status = True
 
 original_terminal_settings = None
 
@@ -74,7 +76,7 @@ def parse_mount_config(line):
     parts = line.split()
     if len(parts) >= 5:
         host_path = parts[2].rstrip('/')
-        mount_target = parts[3].rstrip('/')     # this is the host-side mount dir
+        mount_target = parts[3].rstrip('/')
         host_cwd = os.getcwd().rstrip('/')
 
         if host_cwd.startswith(host_path):
@@ -83,6 +85,46 @@ def parse_mount_config(line):
             container_path = os.path.join(mount_point, rel)
             return container_path
     return None
+
+def display_containers_in_grid(container_names):
+    if display_container_status:
+        container_names_with_status = container_names.copy()
+        for i, container in enumerate(container_names):
+            if i == 0:
+                continue
+            try:
+                result = subprocess.run(
+                    ["lxc-info", "-n", container], 
+                    capture_output=True, 
+                    text=True, 
+                    check=True
+                )
+                if "RUNNING" in result.stdout:
+                    container_names_with_status[i] = f"{container_names[i]} ✓"
+                else:
+                    container_names_with_status[i] = f"{container_names[i]} ✘"
+            except subprocess.CalledProcessError as e:
+                pass
+
+    try: term_width = os.get_terminal_size().columns
+    except OSError: term_width = 80
+
+    max_len = max(len(c) for c in container_names) + 5
+    num_columns = max(1, term_width // max_len)
+    num_rows = (len(container_names) + num_columns - 1) // num_columns
+
+    for row in range(num_rows):
+        row_items = []
+        for col in range(num_columns):
+            index = row + col * num_rows
+            if index < len(container_names):
+                if display_container_status:
+                    item = container_names_with_status[index].ljust(max_len)
+                    item = item.replace("✓", "\033[92m●\033[0m").replace("✘", "\033[91m●\033[0m")
+                else:
+                    item = container_names[index].ljust(max_len)
+                row_items.append(item)
+        print(''.join(row_items))
 
 def container_interface():
     if os.geteuid() != 0:
@@ -98,15 +140,15 @@ def container_interface():
             text=True, 
             check=True
         )
-        containers = result.stdout.split()
+        container_names = result.stdout.split()
     except Exception as e:
         print(f"Error fetching container list: {e}")
         return
 
-    containers.insert(0, "host")
+    container_names.insert(0, "host")
 
     def completer(text, state):
-        options = [c for c in containers if c.lower().startswith(text.lower())]
+        options = [c for c in container_names if c.lower().startswith(text.lower())]
         if state < len(options):
             return options[state]
         return None
@@ -115,29 +157,13 @@ def container_interface():
     readline.parse_and_bind("tab: complete")
 
     print("Choose container to start:")
-    try:
-        term_width = os.get_terminal_size().columns
-    except OSError:
-        term_width = 80  # Default width if terminal size can't be determined
-
-    max_len = max(len(c) for c in containers) + 2  # Adding spacing between columns
-    num_columns = max(1, term_width // max_len)
-    num_rows = (len(containers) + num_columns - 1) // num_columns
-
-    for row in range(num_rows):
-        row_items = []
-        for col in range(num_columns):
-            index = row + col * num_rows
-            if index < len(containers):
-                item = containers[index].ljust(max_len)
-                row_items.append(item)
-        print(''.join(row_items))
+    display_containers_in_grid(container_names)
 
     while True:
         container_name = input("> ").strip()
         if container_name == "host":
             sys.exit(0)
-        elif container_name in containers:
+        elif container_name in container_names:
             break
         else:
             print(f"Invalid choice: {container_name}. Please choose from the list above.")
